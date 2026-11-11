@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LabFluids - Laboratorio Virtual</title>
+    <!-- Se incluye Chart.js para generar el gráfico de resultados -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 20px; 
+            background-color: #f4f7f6; 
+            color: #333; 
+        }
+        h1, h2 { color: #2c3e50; }
+        .container { 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 20px; 
+        }
+        .panel { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+            flex: 1; 
+            min-width: 300px; 
+        }
+        .controls label { 
+            display: block; 
+            margin-top: 15px; 
+            font-weight: bold; 
+        }
+        .controls select { 
+            width: 100%; 
+            padding: 10px; 
+            margin-top: 5px; 
+            border-radius: 4px; 
+            border: 1px solid #ccc; 
+            font-size: 16px; 
+        }
+        .controls button { 
+            width: 100%;
+            padding: 12px;
+            background-color: #2980b9; 
+            color: white; 
+            border: none; 
+            border-radius: 4px;
+            cursor: pointer; 
+            margin-top: 20px; 
+            font-size: 16px;
+            font-weight: bold; 
+            transition: background-color 0.3s;
+        }
+        .controls button:hover { background-color: #1c5980; }
+        .result-box { 
+            margin-top: 20px; 
+            padding: 15px; 
+            background: #e8f4f8; 
+            border-radius: 4px; 
+            border-left: 5px solid #2980b9; 
+            font-size: 1.2em; 
+        }
+        
+        /* Representación visual del recipiente */
+        .tank-container { 
+            width: 120px; 
+            height: 300px; 
+            border: 4px solid #7f8c8d; 
+            border-top: none; 
+            border-radius: 0 0 10px 10px; 
+            position: relative; 
+            margin: 20px auto; 
+            background-color: #ecf0f1; 
+            overflow: hidden; 
+        }
+        .liquid { 
+            position: absolute; 
+            bottom: 0; 
+            width: 100%; 
+            height: 100%; 
+            transition: background-color 0.3s; 
+        }
+        /* Colores representativos para los fluidos */
+        .liquid.agua { background-color: rgba(52, 152, 219, 0.6); }
+        .liquid.aceite { background-color: rgba(241, 196, 15, 0.6); }
+        .liquid.glicerina { background-color: rgba(149, 165, 166, 0.6); }
+        
+        /* Indicador de profundidad */
+        .marker { 
+            position: absolute; 
+            width: 100%; 
+            height: 2px; 
+            background: #c0392b; 
+            top: 0%; 
+            transition: top 0.3s; 
+            z-index: 2; 
+        }
+        .marker::after { 
+            content: ''; 
+            position: absolute; 
+            right: -15px; 
+            top: -5px; 
+            width: 0; 
+            height: 0; 
+            border-top: 6px solid transparent; 
+            border-bottom: 6px solid transparent; 
+            border-right: 10px solid #c0392b; 
+        }
+        
+        /* Tabla de resultados */
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 15px; 
+        }
+        th, td { 
+            border: 1px solid #ddd; 
+            padding: 10px; 
+            text-align: center; 
+        }
+        th { 
+            background-color: #2980b9; 
+            color: white; 
+        }
+    </style>
+</head>
+<body>
+    <h1>LabFluids</h1>
+    <p>Estudio interactivo de la relación entre profundidad, densidad del líquido y presión hidrostática.</p>
+    
+    <div class="container">
+        <!-- Panel de Configuración y Cálculo -->
+        <div class="panel controls">
+            <h2>1. Configuración del Experimento</h2>
+            <label for="liquido">Densidad de Referencia:</label>
+            <select id="liquido">
+                <option value="1000" data-clase="agua">Agua (1.000 kg/m³)</option>
+                <option value="900" data-clase="aceite">Aceite (900 kg/m³)</option>
+                <option value="1260" data-clase="glicerina">Glicerina (1.260 kg/m³)</option>
+            </select>
+            
+            <label for="profundidad">Profundidad de Estudio (h):</label>
+            <select id="profundidad">
+                <option value="0">0 m (Superficie)</option>
+                <option value="0.5">0,5 m</option>
+                <option value="1">1 m</option>
+                <option value="2">2 m</option>
+                <option value="3">3 m</option>
+            </select>
+            
+            <div class="result-box">
+                Presión Calculada (Ph): <br>
+                <strong id="presion-actual">0.00 kPa</strong>
+            </div>
+            
+            <button id="btn-registrar">Registrar Resultado</button>
+        </div>
+        
+        <!-- Panel de Visualización del Recipiente -->
+        <div class="panel">
+            <h2>2. Representación Visual</h2>
+            <div class="tank-container">
+                <div id="tank-liquid" class="liquid agua"></div>
+                <div id="depth-marker" class="marker" style="top: 0%;"></div>
+            </div>
+            <p style="text-align:center;">Punto de estudio ubicado a <strong id="lbl-profundidad">0</strong> metros de profundidad.</p>
+        </div>
+    </div>
+    
+    <div class="container" style="margin-top: 20px;">
+        <!-- Panel de Tabla Comparativa -->
+        <div class="panel">
+            <h2>3. Tabla de Resultados</h2>
+            <table id="tabla-resultados">
+                <thead>
+                    <tr>
+                        <th>Líquido</th>
+                        <th>Densidad (kg/m³)</th>
+                        <th>Profundidad (m)</th>
+                        <th>Presión (kPa)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Las filas se insertarán dinámicamente aquí -->
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Panel de Gráfico de Tendencia -->
+        <div class="panel">
+            <h2>4. Gráfico Presión vs Profundidad</h2>
+            <canvas id="graficoResultados"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Parámetros físicos establecidos en el modelo del proyecto
+        const g = 9.81; // Aceleración gravitatoria (m/s2)
+        const maxProfundidad = 3; // Profundidad máxima para escalar el marcador visual
+        
+        // Referencias a los elementos del DOM
+        const selectLiquido = document.getElementById('liquido');
+        const selectProfundidad = document.getElementById('profundidad');
+        const spanPresionActual = document.getElementById('presion-actual');
+        const btnRegistrar = document.getElementById('btn-registrar');
+        const tankLiquid = document.getElementById('tank-liquid');
+        const depthMarker = document.getElementById('depth-marker');
+        const lblProfundidad = document.getElementById('lbl-profundidad');
+        const tbodyResultados = document.getElementById('tabla-resultados').querySelector('tbody');
+        const ctxGrafico = document.getElementById('graficoResultados').getContext('2d');
+        
+        // Configuración inicial del gráfico usando Chart.js
+        let chart = new Chart(ctxGrafico, {
+            type: 'scatter',
+            data: {
+                datasets: [
+                    { label: 'Agua', data: [], backgroundColor: '#3498db', borderColor: '#3498db', showLine: true, tension: 0 },
+                    { label: 'Aceite', data: [], backgroundColor: '#f1c40f', borderColor: '#f1c40f', showLine: true, tension: 0 },
+                    { label: 'Glicerina', data: [], backgroundColor: '#95a5a6', borderColor: '#95a5a6', showLine: true, tension: 0 }
+                ]
+            },
+            options: {
+                scales: {
+                    x: { title: { display: true, text: 'Profundidad h (m)' }, min: 0, max: 3.5 },
+                    y: { title: { display: true, text: 'Presión Ph (kPa)' }, min: 0 }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' kPa a ' + context.parsed.x + ' m';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Calcula la presión hidrostática en tiempo real y actualiza la UI
+        function actualizarSimulacion() {
+            const densidad = parseFloat(selectLiquido.value);
+            const claseLiquido = selectLiquido.options[selectLiquido.selectedIndex].dataset.clase;
+            const profundidad = parseFloat(selectProfundidad.value);
+            
+            // Aplicación del modelo físico: Ph = p * g * h (Pa)
+            const presionPa = densidad * g * profundidad;
+            const presionKPa = presionPa / 1000; // Conversión a kilopascales (kPa)
+            
+            // Actualización de textos en pantalla
+            spanPresionActual.textContent = presionKPa.toFixed(2) + ' kPa';
+            lblProfundidad.textContent = profundidad;
+            
+            // Actualización del recipiente visual
+            tankLiquid.className = 'liquid ' + claseLiquido;
+            const porcentajeTop = (profundidad / maxProfundidad) * 100;
+            depthMarker.style.top = porcentajeTop + '%';
+        }
+
+        // Se recalculan los valores cada vez que el usuario cambia una variable
+        selectLiquido.addEventListener('change', actualizarSimulacion);
+        selectProfundidad.addEventListener('change', actualizarSimulacion);
+
+        // Lógica del botón para registrar y comparar resultados
+        btnRegistrar.addEventListener('click', () => {
+            const nombreLiquido = selectLiquido.options[selectLiquido.selectedIndex].text.split(' ')[0];
+            const densidad = parseFloat(selectLiquido.value);
+            const profundidad = parseFloat(selectProfundidad.value);
+            const presionKPa = (densidad * g * profundidad) / 1000;
+
+            // Inserción en la tabla de registro
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${nombreLiquido}</td>
+                <td>${densidad}</td>
+                <td>${profundidad}</td>
+                <td>${presionKPa.toFixed(2)}</td>
+            `;
+            tbodyResultados.appendChild(tr);
+
+            // Inserción en el gráfico de tendencia
+            let datasetIndex = 0;
+            if (nombreLiquido === 'Aceite') datasetIndex = 1;
+            if (nombreLiquido === 'Glicerina') datasetIndex = 2;
+            
+            chart.data.datasets[datasetIndex].data.push({ x: profundidad, y: presionKPa });
+            // Se ordenan las coordenadas en X para asegurar que la línea de tendencia se dibuje correctamente
+            chart.data.datasets[datasetIndex].data.sort((a, b) => a.x - b.x);
+            chart.update();
+        });
+
+        // Ejecutar cálculo inicial al cargar la página
+        actualizarSimulacion();
+    </script>
+</body>
+</html>
